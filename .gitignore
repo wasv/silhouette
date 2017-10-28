@@ -1,4 +1,5 @@
 *
+!*/
 !*.*
 !.gitignore
 !.gitattributes
@@ -7,4 +8,6 @@
 *.log
 *.bin
 *~
-
+*.zip
+build/
+*.mp4
