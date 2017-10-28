@@ -2,6 +2,7 @@
 !*.*
 !.gitignore
 !.gitattributes
+!Makefile
 .#*
 *.log
 *.bin
