@@ -38,8 +38,8 @@ int main(int argc, char **argv) {
 										tL = (uint)max( (uint)0, (uint)(tL - (uint)min((uint)1,(uint)input[tL*NC+i])) );
 										tR = (uint)min( (uint)NR-1, (uint)(tR + (uint)min((uint)1,(uint)input[tR*NC+i])) );
 									}
-									L[i] = tL;
-									R[i] = tR;
+									L[i] = tL - center;
+									R[i] = tR - center;
 								}
 								);
 	cl_uchar input[NCOLS][NROWS];
@@ -84,7 +84,8 @@ int main(int argc, char **argv) {
 		/* Assertions. */
 		for(int i = 0; i < NCOLS; i++) {
 			//printf("%d/%d: %d %d\n", fnum, i, L[i], R[i]);
-			if(L[i] != 0 && R[i] != NROWS-1 && L[i] != R[i]) {
+			if( ((NROWS/2) - abs(L[i]) > 2) && (L[i] != 0) &&
+			    ((NROWS/2) - abs(R[i]) > 2) && (R[i] != 0)) {
 				fprintf(outputfile, "%f %d %d\n", angle, i, L[i]);
 				fprintf(outputfile, "%f %d %d\n", angle, i, R[i]);
 			}
