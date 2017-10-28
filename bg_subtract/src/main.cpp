@@ -132,12 +132,13 @@ void averageImages(char* firstFrameFilename) {
     keyboard = 0;
     while( keyboard != 'q' && keyboard != 27 ){
         //get the frame number and write it on the current frame
-        size_t index = fn.find_last_of("0123456789");
+        size_t base = fn.find_last_of("/");
+        size_t index = fn.find_first_of("0123456789", base);
         if(index == string::npos) {
             index = fn.find_last_of("\\");
         }
         size_t index2 = fn.find_last_of(".");
-        string prefix = fn.substr(0,index);
+        string prefix = fn.substr(base,index);
         string suffix = fn.substr(index2);
         string frameNumberString = fn.substr(index, index2-index);
 		cout << prefix << frameNumberString << suffix << endl;

@@ -12,3 +12,6 @@ add_definitions(${PCL_DEFINITIONS})
 
 add_executable (pcd_write pcd_write.cpp)
 target_link_libraries (pcd_write ${PCL_LIBRARIES})
+
+add_executable (tri_mesh tri_mesh.cpp)
+target_link_libraries (tri_mesh ${PCL_LIBRARIES})
