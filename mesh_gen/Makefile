@@ -1,7 +1,7 @@
 CXX = gcc
 
 LDFLAGS = -lOpenCL -lm -lblas -lclBLAS
-CXXFLAGS = -march=native -O0 -std=c11 -Wall -Wextra -pedantic-errors -pthread 
+CXXFLAGS = -ggdb -march=native -O0 -std=c11 -Wall -Wextra -pedantic-errors -pthread 
 
 # ignore warnings when compiling if warn=0
 ifeq ($(warn), 0)

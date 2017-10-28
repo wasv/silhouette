@@ -14,14 +14,17 @@ it's just a clEnqueueNDRangeKernel + get_global_id hello world.
 
 #define NCOLS  600
 #define NROWS  600
-#define FILENAME "binmask1.bin"
 //#define NCOLS 10
 //#define NROWS 8
 //#define FILENAME "binmask.bin"
 
 #define KERNAL(src) #src
 
-int main(void) {
+int main(int argc, char **argv) {
+	if(argc <= 1) {
+		printf("%s","Please specify one or more input files.\n");
+		return EXIT_FAILURE;
+	}
     const char *source = KERNAL(
 								__kernel void kmain(__global uchar *input,
 													__global uint *L,
@@ -40,10 +43,6 @@ int main(void) {
 								}
 								);
     cl_uchar input[NCOLS][NROWS];
-	FILE *fileptr;
-	fileptr = fopen(FILENAME, "rb");  // Open the file in binary mode
-	fread(input, sizeof(cl_uchar), NROWS*NCOLS, fileptr); // Read in the entire file
-	fclose(fileptr); // Close the file
 
 	cl_uint L[NCOLS];
 	cl_uint R[NCOLS];
@@ -53,36 +52,52 @@ int main(void) {
 	cl_uint NC = NCOLS;
 	cl_uint NR = NROWS;
 
+
+
 	/* Run kernel. */
     common_init(&common, source);
-    input_buff = clCreateBuffer(common.context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(input), input, NULL);
-    L_buff = clCreateBuffer(common.context, CL_MEM_READ_ONLY, sizeof(L), NULL, NULL);
-    R_buff = clCreateBuffer(common.context, CL_MEM_WRITE_ONLY, sizeof(R), NULL, NULL);
-    clSetKernelArg(common.kernel, 0, sizeof(input_buff), &input_buff);
-    clSetKernelArg(common.kernel, 1, sizeof(L_buff), &L_buff);
-    clSetKernelArg(common.kernel, 2, sizeof(R_buff), &R_buff);
-	clSetKernelArg(common.kernel, 3, sizeof(NC), &NC);
-	clSetKernelArg(common.kernel, 4, sizeof(NR), &NR);
-    clEnqueueNDRangeKernel(common.command_queue, common.kernel, 1, NULL, &global_work_size, NULL, 0, NULL, NULL);
-    clFlush(common.command_queue);
-    clFinish(common.command_queue);
-    clEnqueueReadBuffer(common.command_queue, L_buff, CL_TRUE, 0, sizeof(L), L, 0, NULL, NULL);
-    clEnqueueReadBuffer(common.command_queue, R_buff, CL_TRUE, 0, sizeof(R), R, 0, NULL, NULL);
+	
+	FILE *outputfile;
+	outputfile = fopen("output.mesh", "w");  // Open the file in binary mode
 
-	/* Assertions. */
-	for(int i = 0; i < NCOLS; i++) {
-		printf("%4d: %3d %3d\n", i, L[i], R[i]);
-		if(L[i] != 0 || R[i] != 0) {
-			printf("%4d,%3d:  %d\n", i, NROWS/2,  input[i][NROWS/2]);
-			printf("%4d,%3d:  %d\n", i, L[i], input[i][L[i]]);
-			printf("%4d,%3d:  %d\n", i, R[i], input[i][R[i]]);
+	for(int fnum = 0; fnum < argc; fnum++) {
+		FILE *inputfile;
+		inputfile = fopen(argv[fnum], "rb");  // Open the file in binary mode
+		fread(input, sizeof(cl_uchar), NROWS*NCOLS, inputfile); // Read in the entire file
+		fclose(inputfile); // Close the file
+		
+		input_buff = clCreateBuffer(common.context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(input), input, NULL);
+		L_buff = clCreateBuffer(common.context, CL_MEM_READ_ONLY, sizeof(L), NULL, NULL);
+		R_buff = clCreateBuffer(common.context, CL_MEM_WRITE_ONLY, sizeof(R), NULL, NULL);
+		clSetKernelArg(common.kernel, 0, sizeof(input_buff), &input_buff);
+		clSetKernelArg(common.kernel, 1, sizeof(L_buff), &L_buff);
+		clSetKernelArg(common.kernel, 2, sizeof(R_buff), &R_buff);
+		clSetKernelArg(common.kernel, 3, sizeof(NC), &NC);
+		clSetKernelArg(common.kernel, 4, sizeof(NR), &NR);
+		clEnqueueNDRangeKernel(common.command_queue, common.kernel, 1, NULL, &global_work_size, NULL, 0, NULL, NULL);
+		clFlush(common.command_queue);
+		clFinish(common.command_queue);
+		clEnqueueReadBuffer(common.command_queue, L_buff, CL_TRUE, 0, sizeof(L), L, 0, NULL, NULL);
+		clEnqueueReadBuffer(common.command_queue, R_buff, CL_TRUE, 0, sizeof(R), R, 0, NULL, NULL);
+
+		float angle = (((float)(fnum-1)/(float)(argc-1))) * 360.0f;
+		/* Assertions. */
+		for(int i = 0; i < NCOLS; i++) {
+			//printf("%d/%d: %d %d\n", fnum, i, L[i], R[i]);
+			if(L[i] != 0 && R[i] != NROWS-1 && L[i] != R[i]) {
+				fprintf(outputfile, "%f %d %d\n", angle, i, L[i]);
+				fprintf(outputfile, "%f %d %d\n", angle, i, R[i]);
+			}
 		}
+
+		/* Cleanup. */
+		clReleaseMemObject(input_buff);
+		clReleaseMemObject(L_buff);
+		clReleaseMemObject(R_buff);
 	}
 
-	/* Cleanup. */
-    clReleaseMemObject(input_buff);
-    clReleaseMemObject(L_buff);
-    clReleaseMemObject(R_buff);
+	fclose(outputfile); // Close the file
+
     common_deinit(&common);
     return EXIT_SUCCESS;
 }

@@ -11,3 +11,4 @@
 *.zip
 build/
 *.mp4
+*.mesh
