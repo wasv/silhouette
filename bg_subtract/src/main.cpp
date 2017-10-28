@@ -72,10 +72,10 @@ void averageCapture(char* videoId) {
         putText(frame, frameNumberString.c_str(), cv::Point(15, 15),
                 FONT_HERSHEY_SIMPLEX, 0.5 , cv::Scalar(0,0,0));
         //show the current frame and the fg masks
-        imshow("Frame", frame);
-        imshow("BG Model", bgModel);
+        //imshow("Frame", frame);
+        //imshow("BG Model", bgModel);
         //get the input from the keyboard
-        keyboard = (char)waitKey( 30 );
+        //keyboard = (char)waitKey( 30 );
     }
     //delete capture object
     capture.release();
@@ -109,10 +109,10 @@ void averageVideo(char* videoFilename) {
         putText(frame, frameNumberString.c_str(), cv::Point(15, 15),
                 FONT_HERSHEY_SIMPLEX, 0.5 , cv::Scalar(0,0,0));
         //show the current frame and the fg masks
-        imshow("Frame", frame);
-        imshow("BG Model", bgModel);
+        //imshow("Frame", frame);
+        //imshow("BG Model", bgModel);
         //get the input from the keyboard
-        keyboard = (char)waitKey( 30 );
+        //keyboard = (char)waitKey( 30 );
     }
     //delete capture object
     capture.release();
@@ -140,7 +140,7 @@ void averageImages(char* firstFrameFilename) {
         string prefix = fn.substr(0,index);
         string suffix = fn.substr(index2);
         string frameNumberString = fn.substr(index, index2-index);
-		cout << prefix << " "  << frameNumberString << " " << suffix << endl;
+		cout << prefix << frameNumberString << suffix << endl;
         istringstream iss(frameNumberString);
         int frameNumber = 0;
         iss >> frameNumber;
@@ -151,18 +151,16 @@ void averageImages(char* firstFrameFilename) {
 
         //update the background model
 		if(bgModel.empty()) {
-			cerr << "Empty bgModel" << endl;
 			bgModel = frame;
 		} else {
-			cerr << frameNumber << endl;
 			bgModel = (bgModel + (frame - bgModel)) / ++frameNumber;
 		}
 		blur(bgModel,bgModel,Size(3,3));
         //show the current frame and the fg masks
-        imshow("Frame", frame);
-        imshow("BG Model", bgModel);
+        //imshow("Frame", frame);
+        //imshow("BG Model", bgModel);
         //get the input from the keyboard
-        keyboard = (char)waitKey( 30 );
+        //keyboard = (char)waitKey( 30 );
         //search for the next image in the sequence
         ostringstream oss;
         oss << (frameNumber);
@@ -225,11 +223,11 @@ void processCapture(char* videoId) {
         putText(frame, frameNumberString.c_str(), cv::Point(15, 15),
                 FONT_HERSHEY_SIMPLEX, 0.5 , cv::Scalar(0,0,0));
         //show the current frame and the fg masks
-        imshow("Frame", frame);
-        imshow("FG Mask", fgMask);
-        imshow("Masked Frame", masked);
+        //imshow("Frame", frame);
+        //imshow("FG Mask", fgMask);
+        //imshow("Masked Frame", masked);
         //get the input from the keyboard
-        keyboard = (char)waitKey( 30 );
+        //keyboard = (char)waitKey( 30 );
     }
     //delete capture object
     capture.release();
@@ -281,11 +279,11 @@ void processVideo(char* videoFilename) {
         putText(frame, frameNumberString.c_str(), cv::Point(15, 15),
                 FONT_HERSHEY_SIMPLEX, 0.5 , cv::Scalar(0,0,0));
         //show the current frame and the fg masks
-        imshow("Frame", frame);
-		imshow("FG Mask", fgMask);
-        imshow("Masked Frame", masked);
+        //imshow("Frame", frame);
+		//imshow("FG Mask", fgMask);
+        //imshow("Masked Frame", masked);
         //get the input from the keyboard
-        keyboard = (char)waitKey( 30 );
+        //keyboard = (char)waitKey( 30 );
     }
     //delete capture object
     capture.release();
@@ -326,7 +324,7 @@ void processImages(char* firstFrameFilename) {
 		blur(fgMask,fgMask,Size(3,3));
 		Canny(fgMask,fgMask,30,100,3);
 		Dilation(&fgMask, MORPH_RECT, 4);
-        imshow("FG Mask", fgMask);
+        //imshow("FG Mask", fgMask);
 		Mat masked;
 		bitwise_and(frame,frame,masked,fgMask);
         //get the frame number and write it on the current frame
@@ -347,10 +345,10 @@ void processImages(char* firstFrameFilename) {
         putText(frame, frameNumberString.c_str(), cv::Point(15, 15),
                 FONT_HERSHEY_SIMPLEX, 0.5 , cv::Scalar(0,0,0));
         //show the current frame and the fg masks
-        imshow("Frame", frame);
-        imshow("FG Mask", fgMask);
-		imwrite("mask-"+frameNumberString+suffix, fgMask);
-
+		//        imshow("Frame", frame);
+        //        imshow("FG Mask", fgMask);
+		
+		imwrite("mask-"+frameNumberString+suffix, masked);
 
 		bitwise_not(fgMask,fgMask);
 		normalize(fgMask,fgMask,0,1,NORM_MINMAX,CV_8UC1);
@@ -358,9 +356,8 @@ void processImages(char* firstFrameFilename) {
 		myFile.write((char*)fgMask.data, fgMask.rows*fgMask.cols);
 		myFile.close();
 
-
-        imshow("Masked Frame", masked);
-        keyboard = (char)waitKey( 0 );
+        //  imshow("Masked Frame", masked);
+        //keyboard = (char)waitKey( 0 )
         //get the input from the keyboard
         //search for the next image in the sequence
         ostringstream oss;
@@ -372,8 +369,9 @@ void processImages(char* firstFrameFilename) {
         if(frame.empty()){
             //error in opening the next image in the sequence
             cerr << "Unable to open image frame: " << nextFrameFilename << endl;
-			nextFrameFilename = firstFrameFilename;
-			frame = imread(nextFrameFilename);
+			//nextFrameFilename = firstFrameFilename;
+			//frame = imread(nextFrameFilename);
+			return;
         }
         //update the path of the current frame
         fn.assign(nextFrameFilename);
@@ -390,10 +388,10 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
     //create GUI windows
-    namedWindow("Frame");
-    namedWindow("BG Model");
-    namedWindow("FG Mask");
-    namedWindow("Masked Frame");
+    //namedWindow("Frame");
+    //namedWindow("BG Model");
+    //namedWindow("FG Mask");
+    //namedWindow("Masked Frame");
     //create Background Subtractor objects
     if(strcmp(argv[1], "-cap") == 0) {
         //input data coming from a video
