@@ -25,10 +25,10 @@ int main(int argc, char **argv) {
 		printf("%s","Please specify one or more input files.\n");
 		return EXIT_FAILURE;
 	}
-    const char *source = KERNAL(
+	const char *source = KERNAL(
 								__kernel void kmain(__global uchar *input,
-													__global uint *L,
-													__global uint *R,
+													__global int *L,
+													__global int *R,
 													const uint NC, const uint NR) {
 									uint i = get_global_id(0);
 									const uint center = NR >> 1;
@@ -42,21 +42,21 @@ int main(int argc, char **argv) {
 									R[i] = tR;
 								}
 								);
-    cl_uchar input[NCOLS][NROWS];
+	cl_uchar input[NCOLS][NROWS];
 
-	cl_uint L[NCOLS];
-	cl_uint R[NCOLS];
-    cl_mem input_buff, L_buff, R_buff;
-    Common common;
-    const size_t global_work_size = NCOLS;
+	cl_int L[NCOLS];
+	cl_int R[NCOLS];
+	cl_mem input_buff, L_buff, R_buff;
+	Common common;
+	const size_t global_work_size = NCOLS;
 	cl_uint NC = NCOLS;
 	cl_uint NR = NROWS;
 
 
 
 	/* Run kernel. */
-    common_init(&common, source);
-	
+	common_init(&common, source);
+
 	FILE *outputfile;
 	outputfile = fopen("output.mesh", "w");  // Open the file in binary mode
 
@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
 		inputfile = fopen(argv[fnum], "rb");  // Open the file in binary mode
 		fread(input, sizeof(cl_uchar), NROWS*NCOLS, inputfile); // Read in the entire file
 		fclose(inputfile); // Close the file
-		
+
 		input_buff = clCreateBuffer(common.context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(input), input, NULL);
 		L_buff = clCreateBuffer(common.context, CL_MEM_READ_ONLY, sizeof(L), NULL, NULL);
 		R_buff = clCreateBuffer(common.context, CL_MEM_WRITE_ONLY, sizeof(R), NULL, NULL);
@@ -98,6 +98,6 @@ int main(int argc, char **argv) {
 
 	fclose(outputfile); // Close the file
 
-    common_deinit(&common);
-    return EXIT_SUCCESS;
+	common_deinit(&common);
+	return EXIT_SUCCESS;
 }
