@@ -26,20 +26,77 @@ void help()
 	<< endl;
 }
 
-void morph( Mat &img, int dilation_type, int dilation_size)
+void morph( Mat &img, int type, int dilation_size, int erode_size)
 {
   Mat element;
-  element = getStructuringElement( dilation_type,
-								   Size( 3, dilation_size + 1 ),
-								   Point( 1, dilation_size/2 ) );
+  if(dilation_size != 0) {
+	  element = getStructuringElement( type,
+									   Size( (4*dilation_size) + 1, (2*dilation_size) + 1 ),
+									   Point( 2*dilation_size, dilation_size ) );
+	  dilate( img, img, element );
+  }
+  
+  if(erode_size != 0) {
+	  element = getStructuringElement( type,
+									   Size( (2*erode_size) + 1, (4*erode_size) + 1 ),
+									   Point( 2*erode_size, erode_size ) );
+	  erode( img, img, element );
+  }
+}
 
-  /// Apply the dilation operation
-  dilate( img, img, element );
+void processFrame(Mat frame, int frameNumber){
+	//update the background model
+	Mat diff;
+	diff = frame - bgModel;
+	diff = abs(diff);
+	blur(diff,diff,Size(3,3));
+	Mat fgMask = Mat::zeros(diff.rows, diff.cols, CV_32F);
+	for(int j=0; j<diff.rows; j++) {
+		for(int i=0; i<diff.cols; i++) {
+			Vec3b p = diff.at<Vec3b>(j,i);
 
-  element = getStructuringElement( dilation_type,
-									   Size( 2*dilation_size + 1, 3 ),
-									   Point( dilation_size, 1 ) );
-  erode( img, img, element );
+			float dist = (p[0]*p[0] + p[1]*p[1] + p[2]*p[2]);
+			dist = sqrt(dist);
+
+			fgMask.at<float>(j,i) = dist;
+		}
+	}
+	normalize(fgMask,fgMask,0,255,NORM_MINMAX,CV_8UC1);
+	blur(fgMask,fgMask,Size(3,3));
+	Mat masked = Mat::zeros(frame.rows,frame.rows,CV_8UC1);
+	threshold(fgMask, masked, 24, 255, CV_THRESH_TOZERO);
+	morph(masked,MORPH_RECT,4,8);
+
+	imwrite(to_string(frameNumber)+"fgmask.png", fgMask);
+
+	vector<vector<Point> > contours;
+	vector<Vec4i> hierarchy;
+	
+	findContours( masked, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+
+    int maxArea = 0;
+	int contourIndex = 0;
+    // test each contour
+    for( size_t i = 0; i < contours.size(); i++ )
+    {
+        // Find largest contour
+        if(fabs(contourArea(contours[i])) > maxArea)
+        {
+            maxArea = fabs(contourArea(contours[i]));
+			contourIndex = i;
+        }
+    }
+
+	masked = Mat::zeros(frame.rows,frame.rows,CV_8UC1);
+	drawContours( masked, contours, contourIndex, Scalar(255), 2, 8, hierarchy, 0, Point() );
+	
+	imwrite(to_string(frameNumber)+"edges.png", masked);
+
+	bitwise_not(fgMask,fgMask);
+	normalize(fgMask,fgMask,0,1,NORM_MINMAX,CV_8UC1);
+	ofstream myFile("binmask"+to_string(frameNumber)+".bin", ios::out | ios::binary);
+	myFile.write((char*)fgMask.data, fgMask.rows*fgMask.cols);
+	myFile.close();
 }
 
 // Takes in old filename, replaces filename with new one, returns framenumber.
@@ -61,35 +118,12 @@ int getNextFilename(string &fn) {
 	return frameNumber;
 }
 
-void updateModel(Mat &model, Mat frame, int frameCount) {
-	if(model.empty()) {
-		model = frame;
+void updateModel(Mat frame, int frameCount) {
+	if(bgModel.empty()) {
+		bgModel = frame.clone();
 	} else {
-		model = (bgModel + (frame - bgModel)) / ++frameCount;
+	    bgModel = bgModel + ((frame - bgModel) / ++frameCount);
 	}
-}
-
-void processFrame(Mat &fgMask, Mat frame, Mat bgModel){
-	//update the background model
-	Mat diff;
-	diff = frame - bgModel;
-	diff = abs(diff);
-	blur(diff,diff,Size(3,3));
-	fgMask = Mat::zeros(diff.rows, diff.cols, CV_32F);
-	for(int j=0; j<diff.rows; j++) {
-		for(int i=0; i<diff.cols; i++) {
-			Vec3b p = diff.at<Vec3b>(j,i);
-
-			float dist = (p[0]*p[0] + p[1]*p[1] + p[2]*p[2]);
-			dist = sqrt(dist);
-
-			fgMask.at<float>(j,i) = dist;
-		}
-	}
-	normalize(fgMask,fgMask,0,255,NORM_MINMAX,CV_8UC1);
-	blur(fgMask,fgMask,Size(3,3));
-	Canny(fgMask,fgMask,30,100,3);
-	morph(fgMask, MORPH_RECT, 4);
 }
 
 void averageCapture(char* videoId) {
@@ -105,7 +139,7 @@ void averageCapture(char* videoId) {
 			break;
 		}
 
-		updateModel(bgModel,frame,frameNumber);
+		updateModel(frame,frameNumber);
 
 		frameNumber += 1;
 	}
@@ -130,7 +164,7 @@ void averageVideo(char* videoFilename) {
 
 		frameNumber = capture.get(CV_CAP_PROP_POS_FRAMES);
 
-		updateModel(bgModel,frame,frameNumber);
+		updateModel(frame,frameNumber);
 	}
 	//delete capture object
 	capture.release();
@@ -144,13 +178,11 @@ void averageImages(string filename) {
 		exit(EXIT_FAILURE);
 	}
 	//current image filename
-	//read input data. ESC or 'q' for quitting
 	while(1){
 		int frameNumber = getNextFilename(filename);
 
 		//update the background model
-		updateModel(bgModel,frame,frameNumber);
-		blur(bgModel,bgModel,Size(3,3));
+		updateModel(frame,frameNumber);
 
 		//read the next frame
 		frame = imread(filename);
@@ -163,13 +195,12 @@ void averageImages(string filename) {
 }
 
 void processCapture(char* videoId) {
-	Mat frame, fgMask, masked;
+	Mat frame;
 	//create the capture object
 	int camId = videoId[0] - '0';
 	VideoCapture capture(camId);
 	while(!capture.isOpened()){}
-	//read input data. SPC or 'q' for advancing
-	int frameNumber = 0;
+	int frameNumber;
 	while(1){
 		//read the current frame
 		if(!capture.read(frame)) {
@@ -177,25 +208,16 @@ void processCapture(char* videoId) {
 			break;
 		}
 
-		frameNumber = capture.get(CV_CAP_PROP_POS_FRAMES);
-		processFrame(fgMask,frame,bgModel);
+		frameNumber = capture.get(CV_CAP_PROP_POS_FRAMES) - 1;
 
-		masked = Mat::zeros(frame.rows,frame.rows,CV_32FC3);
-		bitwise_and(frame,frame,masked,fgMask);
-		imwrite("mask-"+to_string(frameNumber)+".png", masked);
-
-		bitwise_not(fgMask,fgMask);
-		normalize(fgMask,fgMask,0,1,NORM_MINMAX,CV_8UC1);
-		ofstream myFile("binmask"+to_string(frameNumber)+".bin", ios::out | ios::binary);
-		myFile.write((char*)fgMask.data, fgMask.rows*fgMask.cols);
-		myFile.close();
+		processFrame(frame,frameNumber);
 		frameNumber += 1;
 	}
 	//delete capture object
 	capture.release();
 }
 void processVideo(char* videoFilename) {
-	Mat frame, fgMask, masked;
+	Mat frame;
 	int frameNumber;
 	//create the capture object
 	VideoCapture capture(videoFilename);
@@ -204,7 +226,6 @@ void processVideo(char* videoFilename) {
 		cerr << "Unable to open video file: " << videoFilename << endl;
 		exit(EXIT_FAILURE);
 	}
-	//read input data. ESC or 'q' for quitting
 	while(1){
 		//read the current frame
 		if(!capture.read(frame)) {
@@ -212,18 +233,9 @@ void processVideo(char* videoFilename) {
 			break;
 		}
 
-		frameNumber = capture.get(CV_CAP_PROP_POS_FRAMES);
-		processFrame(fgMask,frame,bgModel);
+		frameNumber = capture.get(CV_CAP_PROP_POS_FRAMES) - 1;
 
-		masked = Mat::zeros(frame.rows,frame.rows,CV_32FC3);
-		bitwise_and(frame,frame,masked,fgMask);
-		imwrite("mask-"+to_string(frameNumber)+".png", masked);
-
-		bitwise_not(fgMask,fgMask);
-		normalize(fgMask,fgMask,0,1,NORM_MINMAX,CV_8UC1);
-		ofstream myFile("binmask"+to_string(frameNumber)+".bin", ios::out | ios::binary);
-		myFile.write((char*)fgMask.data, fgMask.rows*fgMask.cols);
-		myFile.close();
+		processFrame(frame,frameNumber);
 	}
 	//delete capture object
 	capture.release();
@@ -236,24 +248,11 @@ void processImages(string filename) {
 		cerr << "Unable to open first image frame: " << filename << endl;
 		exit(EXIT_FAILURE);
 	}
-	Mat fgMask, masked;
-	//current image filename
-	//read input data. ESC or 'q' for quitting
 	while(1){
-
-		processFrame(fgMask,frame,bgModel);
 
 		int frameNumber = getNextFilename(filename);
 
-		masked = Mat::zeros(frame.rows,frame.rows,CV_32FC3);
-		bitwise_and(frame,frame,masked,fgMask);
-		imwrite("mask-"+to_string(frameNumber)+".png", masked);
-
-		bitwise_not(fgMask,fgMask);
-		normalize(fgMask,fgMask,0,1,NORM_MINMAX,CV_8UC1);
-		ofstream myFile("binmask"+to_string(frameNumber)+".bin", ios::out | ios::binary);
-		myFile.write((char*)fgMask.data, fgMask.rows*fgMask.cols);
-		myFile.close();
+		processFrame(frame,frameNumber);
 
 		//read the next frame
 		frame = imread(filename);
@@ -274,11 +273,6 @@ int main(int argc, char* argv[])
 		cerr <<"exiting..." << endl;
 		return EXIT_FAILURE;
 	}
-	//create GUI windows
-	//namedWindow("Frame");
-	//namedWindow("BG Model");
-	//namedWindow("FG Mask");
-	//namedWindow("Masked Frame");
 	//create Background Subtractor objects
 	if(strcmp(argv[1], "-cap") == 0) {
 		//input data coming from a video
